@@ -1,30 +1,24 @@
-/*global global, window*/
-/**
- * @author Christian Johansen (christian@cjohansen.no) and contributors
- * @license BSD
- *
- * Copyright (c) 2010-2014 Christian Johansen
- */
-
 (function (global) {
     "use strict";
 
+    var userAgent = global.navigator && global.navigator.userAgent;
+    var isRunningInIE = userAgent && userAgent.indexOf("MSIE ") > -1;
+
     // Make properties writable in IE, as per
     // http://www.adequatelygood.com/Replacing-setTimeout-Globally.html
-    // JSLint being anal
-    var glbl = global;
-
-    global.setTimeout = glbl.setTimeout;
-    global.clearTimeout = glbl.clearTimeout;
-    global.setInterval = glbl.setInterval;
-    global.clearInterval = glbl.clearInterval;
-    global.Date = glbl.Date;
+    if (isRunningInIE) {
+        global.setTimeout = global.setTimeout;
+        global.clearTimeout = global.clearTimeout;
+        global.setInterval = global.setInterval;
+        global.clearInterval = global.clearInterval;
+        global.Date = global.Date;
+    }
 
     // setImmediate is not a standard function
     // avoid adding the prop to the window object if not present
     if (global.setImmediate !== undefined) {
-        global.setImmediate = glbl.setImmediate;
-        global.clearImmediate = glbl.clearImmediate;
+        global.setImmediate = global.setImmediate;
+        global.clearImmediate = global.clearImmediate;
     }
 
     // node expects setTimeout/setInterval to return a fn object w/ .ref()/.unref()
@@ -143,22 +137,22 @@
             // Defensive and verbose to avoid potential harm in passing
             // explicit undefined when user does not pass argument
             switch (arguments.length) {
-            case 0:
-                return new NativeDate(ClockDate.clock.now);
-            case 1:
-                return new NativeDate(year);
-            case 2:
-                return new NativeDate(year, month);
-            case 3:
-                return new NativeDate(year, month, date);
-            case 4:
-                return new NativeDate(year, month, date, hour);
-            case 5:
-                return new NativeDate(year, month, date, hour, minute);
-            case 6:
-                return new NativeDate(year, month, date, hour, minute, second);
-            default:
-                return new NativeDate(year, month, date, hour, minute, second, ms);
+                case 0:
+                    return new NativeDate(ClockDate.clock.now);
+                case 1:
+                    return new NativeDate(year);
+                case 2:
+                    return new NativeDate(year, month);
+                case 3:
+                    return new NativeDate(year, month, date);
+                case 4:
+                    return new NativeDate(year, month, date, hour);
+                case 5:
+                    return new NativeDate(year, month, date, hour, minute);
+                case 6:
+                    return new NativeDate(year, month, date, hour, minute, second);
+                default:
+                    return new NativeDate(year, month, date, hour, minute, second, ms);
             }
         }
 
@@ -176,7 +170,7 @@
 
         timer.id = uniqueTimerId++;
         timer.createdAt = clock.now;
-        timer.callAt = clock.now + (timer.delay || (clock.duringTick ? 1 : 0));
+        timer.callAt = clock.now + (parseInt(timer.delay) || (clock.duringTick ? 1 : 0));
 
         clock.timers[timer.id] = timer;
 
@@ -192,6 +186,7 @@
     }
 
 
+    /* eslint consistent-return: "off" */
     function compareTimers(a, b) {
         // Sort first by absolute timing
         if (a.callAt < b.callAt) {
@@ -292,6 +287,7 @@
             if (typeof timer.func === "function") {
                 timer.func.apply(null, timer.args);
             } else {
+                /* eslint no-eval: "off" */
                 eval(timer.func);
             }
         } catch (e) {
@@ -343,7 +339,8 @@
             if (timerType(timer) === ttype) {
                 delete clock.timers[timerId];
             } else {
-                throw new Error("Cannot clear timer: timer created with set" + ttype + "() but cleared with clear" + timerType(timer) + "()");
+                throw new Error("Cannot clear timer: timer created with set" + timerType(timer)
+                                + "() but cleared with clear" + ttype + "()");
             }
         }
     }
@@ -352,19 +349,19 @@
         var method,
             i,
             l;
-        var installedHrTime = "_hrtime"; // make jslint happy
+        var installedHrTime = "_hrtime";
 
         for (i = 0, l = clock.methods.length; i < l; i++) {
             method = clock.methods[i];
-            if (method === "hrtime") {
+            if (method === "hrtime" && target.process) {
                 target.process.hrtime = clock[installedHrTime];
             } else {
-                if (target[method].hadOwnProperty) {
+                if (target[method] && target[method].hadOwnProperty) {
                     target[method] = clock["_" + method];
                 } else {
                     try {
                         delete target[method];
-                    } catch (ignore) {}
+                    } catch (ignore) { /* eslint empty-block: "off" */ }
                 }
             }
         }
@@ -404,7 +401,7 @@
         clearImmediate: global.clearImmediate,
         setInterval: setInterval,
         clearInterval: clearInterval,
-        Date: Date,
+        Date: Date
     };
 
     if (hrtimePresent) {
@@ -542,6 +539,10 @@
         clock.runAll = function runAll() {
             var numTimers, i;
             for (i = 0; i < clock.loopLimit; i++) {
+                if (!clock.timers) {
+                    return clock.now;
+                }
+
                 numTimers = Object.keys(clock.timers).length;
                 if (numTimers === 0) {
                     return clock.now;
@@ -550,7 +551,7 @@
                 clock.next();
             }
 
-            throw new Error('Aborting after running ' + clock.loopLimit + 'timers, assuming an infinite loop!');
+            throw new Error("Aborting after running " + clock.loopLimit + "timers, assuming an infinite loop!");
         };
 
         clock.runToLast = function runToLast() {
